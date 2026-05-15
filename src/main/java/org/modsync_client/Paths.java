@@ -15,6 +15,10 @@ public class Paths {
         return resolveAppData().resolve("modsync").resolve("state.json");
     }
 
+    public static Path resolveLogFile() {
+        return resolveAppData().resolve("modsync").resolve("log.txt");
+    }
+
     private static Path resolveAppData() {
         String appData = System.getenv("APPDATA");
         if (appData == null || appData.isBlank()) {

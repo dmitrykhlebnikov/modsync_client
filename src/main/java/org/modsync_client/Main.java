@@ -9,9 +9,11 @@ import org.modsync_client.state.StateStore;
 import org.modsync_client.sync.SyncExecutor;
 import org.modsync_client.sync.SyncPlan;
 import org.modsync_client.sync.SyncPlanner;
+import org.modsync_client.util.Console;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
@@ -19,24 +21,39 @@ import java.util.Scanner;
 public class Main {
 
     public static void main(String[] argv) {
+        boolean noPause = Arrays.asList(argv).contains("--no-pause");
+        int exitCode = 0;
+        try {
+            exitCode = run(argv);
+        } catch (Throwable t) {
+            System.err.println("Fatal error: " + t.getMessage());
+            tryWriteLog(t);
+            exitCode = 1;
+        } finally {
+            Console.pause(noPause);
+        }
+        if (exitCode != 0) System.exit(exitCode);
+    }
+
+    private static int run(String[] argv) throws Exception {
         Args args;
         try {
             args = Args.parse(argv);
         } catch (IllegalArgumentException e) {
             System.err.println(e.getMessage());
-            System.exit(1);
-            return;
+            return 1;
         }
 
         Path minecraftDir;
         Path stateFile;
+        Path logFile;
         try {
             minecraftDir = Paths.resolveMinecraftDir(args);
             stateFile    = Paths.resolveStateFile();
+            logFile      = Paths.resolveLogFile();
         } catch (IllegalStateException e) {
             System.err.println(e.getMessage());
-            System.exit(1);
-            return;
+            return 1;
         }
 
         System.out.println("Manifest URL : " + args.manifestUrl());
@@ -48,8 +65,7 @@ public class Main {
             manifest = ManifestFetcher.fetch(args.manifestUrl());
         } catch (IllegalStateException | IllegalArgumentException e) {
             System.err.println("Error: " + e.getMessage());
-            System.exit(1);
-            return;
+            return 1;
         }
 
         System.out.println();
@@ -78,8 +94,7 @@ public class Main {
             state = store.load();
         } catch (IOException e) {
             System.err.println("Error loading state: " + e.getMessage());
-            System.exit(1);
-            return;
+            return 1;
         }
 
         Path modsDir = minecraftDir.resolve("mods");
@@ -89,12 +104,12 @@ public class Main {
             if (SyncPlanner.isUpToDate(manifest, modsDir, packState)) {
                 System.out.println();
                 System.out.println("Already up to date.");
-                return;
+                Console.appendLog(logFile, "Already up to date: " + manifest.packName + " " + manifest.packVersion);
+                return 0;
             }
         } catch (IOException e) {
             System.err.println("Error checking state: " + e.getMessage());
-            System.exit(1);
-            return;
+            return 1;
         }
 
         SyncPlan plan;
@@ -102,22 +117,22 @@ public class Main {
             plan = SyncPlanner.plan(manifest, modsDir, packState);
         } catch (IOException e) {
             System.err.println("Error planning sync: " + e.getMessage());
-            System.exit(1);
-            return;
+            return 1;
         }
 
         if (!plan.collisions().isEmpty()) {
             System.out.println();
             System.out.println("The following files exist in mods/ but were not placed by this tool:");
             for (SyncPlan.Collision c : plan.collisions()) {
-                System.out.println("  " + c.manifestEntry().filename + " (local hash: " + c.existingHash().substring(0, 8) + "...)");
+                System.out.println("  " + c.manifestEntry().filename
+                        + " (local hash: " + c.existingHash().substring(0, 8) + "...)");
             }
             if (!args.yes()) {
                 System.out.print("Overwrite them? [y/N] ");
                 String answer = new Scanner(System.in).nextLine().trim();
                 if (!answer.equalsIgnoreCase("y")) {
                     System.out.println("Aborted.");
-                    return;
+                    return 0;
                 }
             }
         }
@@ -139,7 +154,7 @@ public class Main {
         if (args.dryRun()) {
             System.out.println();
             System.out.println("Dry run — no changes made.");
-            return;
+            return 0;
         }
 
         if (!args.yes()) {
@@ -149,14 +164,14 @@ public class Main {
                 String answer = new Scanner(System.in).nextLine().trim();
                 if (!answer.equals("yes")) {
                     System.out.println("Aborted.");
-                    return;
+                    return 0;
                 }
             } else {
                 System.out.print("\nProceed? [Y/n] ");
                 String answer = new Scanner(System.in).nextLine().trim();
                 if (answer.equalsIgnoreCase("n")) {
                     System.out.println("Aborted.");
-                    return;
+                    return 0;
                 }
             }
         }
@@ -167,14 +182,15 @@ public class Main {
                     .execute(plan, manifest, args.manifestUrl());
         } catch (IOException e) {
             System.err.println("Sync failed: " + e.getMessage());
-            System.exit(1);
-            return;
+            try { Console.appendLog(logFile, "Sync failed", e); } catch (IOException ignored) {}
+            return 1;
         }
 
         newPackState.ifPresent(ps -> {
             state.packs.put(manifest.packName, ps);
             try {
                 store.save(state);
+                Console.appendLog(logFile, "Sync complete: " + manifest.packName + " " + manifest.packVersion);
             } catch (IOException e) {
                 System.err.println("Warning: failed to save state: " + e.getMessage());
             }
@@ -182,5 +198,12 @@ public class Main {
 
         System.out.println();
         System.out.println("Sync complete.");
+        return 0;
+    }
+
+    private static void tryWriteLog(Throwable t) {
+        try {
+            Console.appendLog(Paths.resolveLogFile(), "Fatal error: " + t.getMessage(), t);
+        } catch (Throwable ignored) {}
     }
 }
