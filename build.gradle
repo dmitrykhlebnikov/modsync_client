@@ -30,3 +30,46 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+
+// ── Packaging ─────────────────────────────────────────────────────────────────
+// Run on the target OS (Windows) to produce a Windows app-image.
+// On Linux/macOS these tasks produce a native app-image for that platform instead.
+
+def jlinkRuntimeDir = layout.buildDirectory.dir('jlink-runtime')
+def appImageDir     = layout.buildDirectory.dir('app-image')
+
+tasks.register('jlinkRuntime', Exec) {
+    description = 'Builds a minimal JRE containing only the modules this app needs.'
+    group       = 'distribution'
+
+    outputs.dir(jlinkRuntimeDir)
+    doFirst { delete jlinkRuntimeDir }
+
+    commandLine 'jlink',
+        '--add-modules', 'java.base,java.net.http',
+        '--strip-debug',
+        '--no-man-pages',
+        '--no-header-files',
+        '--output', jlinkRuntimeDir.get().asFile.absolutePath
+}
+
+tasks.register('jpackageImage', Exec) {
+    description = 'Packages the app as a self-contained app-image (folder + bundled JRE).'
+    group       = 'distribution'
+    dependsOn   installDist, jlinkRuntime
+
+    def libDir = layout.buildDirectory.dir('install/modsync_client/lib')
+
+    outputs.dir(appImageDir)
+    doFirst { delete appImageDir }
+
+    commandLine 'jpackage',
+        '--input',         libDir.get().asFile.absolutePath,
+        '--main-jar',      jar.archiveFileName.get(),
+        '--main-class',    'org.modsync_client.Main',
+        '--name',          'modsync',
+        '--app-version',   '1.0.0',
+        '--type',          'app-image',
+        '--runtime-image', jlinkRuntimeDir.get().asFile.absolutePath,
+        '--dest',          appImageDir.get().asFile.absolutePath
+}
