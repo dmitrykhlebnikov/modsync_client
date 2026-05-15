@@ -188,4 +188,60 @@ class SyncPlannerTest {
 
         assertTrue(plan.toRemove().isEmpty());
     }
+
+    // --- isUpToDate ---
+
+    @Test
+    void isUpToDateReturnsTrueWhenVersionMatchesAndAllJarsPresent() throws Exception {
+        String content = "sodium-content";
+        Files.writeString(modsDir.resolve("sodium.jar"), content);
+        Manifest m = manifest(entry("sodium.jar", content));
+
+        State.PackState ps = new State.PackState();
+        ps.packVersion = "1.0";
+        ps.managedJars = List.of(managed("sodium.jar", content));
+
+        assertTrue(SyncPlanner.isUpToDate(m, modsDir, ps));
+    }
+
+    @Test
+    void isUpToDateReturnsFalseWhenPackStateIsNull() throws Exception {
+        assertFalse(SyncPlanner.isUpToDate(manifest(entry("sodium.jar", "c")), modsDir, null));
+    }
+
+    @Test
+    void isUpToDateReturnsFalseWhenVersionDiffers() throws Exception {
+        String content = "sodium-content";
+        Files.writeString(modsDir.resolve("sodium.jar"), content);
+        Manifest m = manifest(entry("sodium.jar", content));
+
+        State.PackState ps = new State.PackState();
+        ps.packVersion = "2.0";
+        ps.managedJars = List.of(managed("sodium.jar", content));
+
+        assertFalse(SyncPlanner.isUpToDate(m, modsDir, ps));
+    }
+
+    @Test
+    void isUpToDateReturnsFalseWhenManagedJarMissing() throws Exception {
+        Manifest m = manifest(entry("sodium.jar", "content"));
+
+        State.PackState ps = new State.PackState();
+        ps.packVersion = "1.0";
+        ps.managedJars = List.of(managed("sodium.jar", "content"));
+
+        assertFalse(SyncPlanner.isUpToDate(m, modsDir, ps));
+    }
+
+    @Test
+    void isUpToDateReturnsFalseWhenManagedJarHashWrong() throws Exception {
+        Files.writeString(modsDir.resolve("sodium.jar"), "tampered");
+        Manifest m = manifest(entry("sodium.jar", "original"));
+
+        State.PackState ps = new State.PackState();
+        ps.packVersion = "1.0";
+        ps.managedJars = List.of(managed("sodium.jar", "original"));
+
+        assertFalse(SyncPlanner.isUpToDate(m, modsDir, ps));
+    }
 }

@@ -57,6 +57,20 @@ public class SyncPlanner {
         return map;
     }
 
+    public static boolean isUpToDate(Manifest manifest, Path modsDir, State.PackState packState)
+            throws IOException {
+        if (packState == null || !manifest.packVersion.equals(packState.packVersion)) {
+            return false;
+        }
+        if (packState.managedJars == null) return true;
+        for (State.PackState.ManagedJar jar : packState.managedJars) {
+            Path file = modsDir.resolve(jar.filename);
+            if (!Files.exists(file)) return false;
+            if (!Hashing.sha256(file).equals(jar.sha256)) return false;
+        }
+        return true;
+    }
+
     private static List<State.PackState.ManagedJar> buildRemoveList(
             Manifest manifest, State.PackState packState) {
         if (packState == null || packState.managedJars == null || packState.managedJars.isEmpty()) {
