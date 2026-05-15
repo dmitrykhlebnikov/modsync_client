@@ -1,5 +1,7 @@
 package org.modsync_client;
 
+import java.nio.file.Path;
+
 public class Main {
 
     public static void main(String[] argv) {
@@ -12,8 +14,8 @@ public class Main {
             return;
         }
 
-        java.nio.file.Path minecraftDir;
-        java.nio.file.Path stateFile;
+        Path minecraftDir;
+        Path stateFile;
         try {
             minecraftDir = Paths.resolveMinecraftDir(args);
             stateFile    = Paths.resolveStateFile();
