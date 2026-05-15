@@ -145,3 +145,126 @@ src/main/java/org/modsync_client/
 ## Server protocol
 
 See [PROTOCOL.md](PROTOCOL.md) for the full `modsync-server` HTTP API — manifest schema, jar download endpoint, and the `pack_version` fingerprint algorithm.
+
+
+---
+## Packaging-executable
+
+The packaging tasks must be run on Windows to produce a Windows `.exe` installer or app-image. They require a full JDK 21 (with `jmods/`) on `PATH`.
+
+---
+
+## Building JAR (required first step)
+
+Before packaging, build the application:
+
+```bash
+./gradlew build
+```
+
+Output JAR will be in:
+
+```
+build/libs/modsync_client-1.0-SNAPSHOT.jar
+```
+
+---
+
+## Creating a Windows `.exe` installer with `jpackage`
+
+You can generate a native Windows installer using `jpackage`.
+
+### Basic command
+
+```powershell
+jpackage ^
+  --type exe ^
+  --name modsync ^
+  --app-version 21.0.0 ^
+  --input build/libs ^
+  --main-jar modsync_client-1.0-SNAPSHOT.jar ^
+  --main-class org.modsync_client.Main ^
+  --icon icon.ico ^
+  --dest dist ^
+  --win-menu ^
+  --win-shortcut
+```
+
+---
+
+## What each option means
+
+| Option                                 | Meaning                                                |
+| -------------------------------------- | ------------------------------------------------------ |
+| `--type exe`                           | Generates a Windows `.exe` installer                   |
+| `--name modsync`                       | Application name shown in installer and system         |
+| `--app-version 21.0.0`                 | Version displayed in Windows Apps / installer metadata |
+| `--input build/libs`                   | Folder containing the compiled JAR file                |
+| `--main-jar ...`                       | The JAR file to run                                    |
+| `--main-class org.modsync_client.Main` | Entry point (Java main class package)                  |
+| `--icon icon.ico`                      | Application icon for installer and shortcut            |
+| `--dest dist`                          | Output directory for generated installer               |
+| `--win-menu`                           | Adds Start Menu entry                                  |
+| `--win-shortcut`                       | Creates desktop shortcut                               |
+
+---
+
+## Output
+
+After running `jpackage`, the installer will be created at:
+
+```
+dist/modsync-21.0.0.exe
+```
+
+(or similar depending on version/name)
+
+---
+
+## Optional: MSI installer instead of EXE
+
+You can generate an MSI installer:
+
+```powershell
+jpackage ^
+  --type msi ^
+  --name modsync ^
+  --app-version 21.0.0 ^
+  --input build/libs ^
+  --main-jar modsync_client-1.0-SNAPSHOT.jar ^
+  --main-class org.modsync_client.Main ^
+  --icon icon.ico ^
+  --dest dist
+```
+
+---
+
+## Notes
+
+* `jpackage` does **not modify your Gradle build** — it only packages output artifacts.
+* The JAR must run correctly via:
+
+  ```bash
+  java -jar build/libs/modsync_client-1.0-SNAPSHOT.jar
+  ```
+* Windows packaging must be done on Windows OS.
+
+---
+
+## Packaging (legacy app-image workflow)
+
+The packaging tasks must be run on Windows to produce a Windows app-image. They require a full JDK 21 (with `jmods/`) on `PATH`.
+
+```batch
+rem 1. Build a minimal runtime (if using jlink)
+gradlew jlinkRuntime
+
+rem 2. Assemble app-image
+gradlew jpackageImage
+```
+
+Output is in:
+
+```
+build/app-image/modsync/
+```
