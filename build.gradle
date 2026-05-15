@@ -31,6 +31,27 @@ test {
     useJUnitPlatform()
 }
 
+// ── Fat JAR ───────────────────────────────────────────────────────────────────
+
+tasks.register('fatJar', Jar) {
+    description = 'Builds a self-contained JAR with all dependencies bundled.'
+    group       = 'distribution'
+    dependsOn   configurations.runtimeClasspath
+
+    archiveClassifier = 'all'
+
+    manifest {
+        attributes 'Main-Class': application.mainClass
+    }
+
+    from sourceSets.main.output
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 // ── Packaging ─────────────────────────────────────────────────────────────────
 // Run on the target OS (Windows) to produce a Windows app-image.
 // On Linux/macOS these tasks produce a native app-image for that platform instead.
