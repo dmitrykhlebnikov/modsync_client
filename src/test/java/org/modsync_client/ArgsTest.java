@@ -38,7 +38,10 @@ class ArgsTest {
 
     @Test
     void throwsOnNoArgs() {
-        assertThrows(IllegalArgumentException.class, () -> Args.parse(new String[]{}));
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class, () -> Args.parse(new String[]{}));
+        assertTrue(ex.getMessage().contains("modsync <manifest-url>"),
+            "Expected USAGE in message, got: " + ex.getMessage());
     }
 
     @Test
@@ -51,5 +54,11 @@ class ArgsTest {
     void throwsOnMissingMinecraftDirValue() {
         assertThrows(IllegalArgumentException.class,
             () -> Args.parse(new String[]{"https://x.com/m.json", "--minecraft-dir"}));
+    }
+
+    @Test
+    void throwsOnDuplicateUrl() {
+        assertThrows(IllegalArgumentException.class,
+            () -> Args.parse(new String[]{"https://a.com/m.json", "https://b.com/m.json"}));
     }
 }
